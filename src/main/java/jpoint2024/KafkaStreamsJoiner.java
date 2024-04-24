@@ -1,31 +1,29 @@
 package jpoint2024;
 
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Named;
-import jpoint2024.model.TopicOneModel;
-import jpoint2024.model.TopicThreeModel;
-import jpoint2024.model.TopicTwoModel;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.jboss.logging.Logger;
 
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Named;
+import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 @ApplicationScoped
 public class KafkaStreamsJoiner {
     private final Logger logger;
-    private final AtomicReference<ReadOnlyKeyValueStore<TopicOneModel.Key, TopicOneModel.Value>> topicOneStoreRef;
-    private final AtomicReference<ReadOnlyKeyValueStore<TopicTwoModel.Key, TopicTwoModel.Value>> topicTwoStoreRef;
-    private final AtomicReference<ReadOnlyKeyValueStore<TopicThreeModel.Key, TopicThreeModel.Value>> topicThreeStoreRef;
+    private final AtomicReference<ReadOnlyKeyValueStore<String, String>> topicOneStoreRef;
+    private final AtomicReference<ReadOnlyKeyValueStore<String, String>> topicTwoStoreRef;
+    private final AtomicReference<ReadOnlyKeyValueStore<String, String>> topicThreeStoreRef;
 
     public KafkaStreamsJoiner(
             Logger logger,
             @Named("topic-one-store")
-            AtomicReference<ReadOnlyKeyValueStore<TopicOneModel.Key, TopicOneModel.Value>> topicOneStoreRef,
+            AtomicReference<ReadOnlyKeyValueStore<String, String>> topicOneStoreRef,
             @Named("topic-two-store")
-            AtomicReference<ReadOnlyKeyValueStore<TopicTwoModel.Key, TopicTwoModel.Value>> topicTwoStoreRef,
+            AtomicReference<ReadOnlyKeyValueStore<String, String>> topicTwoStoreRef,
             @Named("topic-three-store")
-            AtomicReference<ReadOnlyKeyValueStore<TopicThreeModel.Key, TopicThreeModel.Value>> topicThreeStoreRef) {
+            AtomicReference<ReadOnlyKeyValueStore<String, String>> topicThreeStoreRef) {
         this.logger = logger;
         this.topicOneStoreRef = topicOneStoreRef;
         this.topicTwoStoreRef = topicTwoStoreRef;
@@ -46,9 +44,16 @@ public class KafkaStreamsJoiner {
                 var stateOneIterator = stateOne.all();
                 var stateTwoIterator = stateTwo.all();
                 var stateThreeIterator = stateThree.all()
-                ) {
+        ) {
+            var mapOne = new HashMap<String, String>();
+            var mapTwo = new HashMap<String, String>();
+            var mapThree = new HashMap<String, String>();
 
-            // process each record as you wish
+            stateOneIterator.forEachRemaining(record -> mapOne.put(record.key, record.value));
+            stateTwoIterator.forEachRemaining(record -> mapTwo.put(record.key, record.value));
+            stateThreeIterator.forEachRemaining(record -> mapThree.put(record.key, record.value));
+
+            logger.infof("Current state for topic1: %s\nCurrent state for topic2: %s\nCurrent state for topic3: %s", mapOne, mapTwo, mapThree);
 
         } catch (InvalidStateStoreException e) {
             logger.warnf("State is currently migrating: %s", e.getMessage());

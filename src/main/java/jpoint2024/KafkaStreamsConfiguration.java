@@ -1,21 +1,9 @@
 package jpoint2024;
 
-import io.confluent.kafka.streams.serdes.json.KafkaJsonSchemaSerde;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Observes;
-import jakarta.enterprise.inject.Produces;
-import jakarta.inject.Named;
-import jpoint2024.model.TopicOneModel;
-import jpoint2024.model.TopicThreeModel;
-import jpoint2024.model.TopicTwoModel;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.CustomStreamsConfig;
-import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.StoreQueryParameters;
-import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.errors.StreamsUncaughtExceptionHandler;
+import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.ValueTransformerWithKey;
 import org.apache.kafka.streams.processor.ProcessorContext;
@@ -25,6 +13,10 @@ import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.apache.kafka.streams.state.Stores;
 import org.jboss.logging.Logger;
 
+import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.event.Observes;
+import javax.enterprise.inject.Produces;
+import javax.inject.Named;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Properties;
@@ -35,9 +27,9 @@ public class KafkaStreamsConfiguration {
     private final Logger logger;
     private KafkaStreams kafkaStreams;
 
-    private final AtomicReference<ReadOnlyKeyValueStore<TopicOneModel.Key, TopicOneModel.Value>> topicOneStoreRef;
-    private final AtomicReference<ReadOnlyKeyValueStore<TopicTwoModel.Key, TopicTwoModel.Value>> topicTwoStoreRef;
-    private final AtomicReference<ReadOnlyKeyValueStore<TopicThreeModel.Key, TopicThreeModel.Value>> topicThreeStoreRef;
+    private final AtomicReference<ReadOnlyKeyValueStore<String, String>> topicOneStoreRef;
+    private final AtomicReference<ReadOnlyKeyValueStore<String, String>> topicTwoStoreRef;
+    private final AtomicReference<ReadOnlyKeyValueStore<String, String>> topicThreeStoreRef;
 
     private final AtomicReference<KafkaStreams> assignedPartitions;
 
@@ -60,10 +52,14 @@ public class KafkaStreamsConfiguration {
         var builder = new StreamsBuilder();
 
         var properties = new Properties();
+        properties.put(StreamsConfig.APPLICATION_ID_CONFIG, "jpoint2024");
+        properties.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        properties.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
+        properties.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
 
-        var topicOneKeySerde = new KafkaJsonSchemaSerde<TopicOneModel.Key>();
-        var topicTwoKeySerde = new KafkaJsonSchemaSerde<TopicTwoModel.Key>();
-        var topicThreeKeySerde = new KafkaJsonSchemaSerde<TopicThreeModel.Key>();
+        var topicOneKeySerde = Serdes.String();
+        var topicTwoKeySerde = Serdes.String();
+        var topicThreeKeySerde = Serdes.String();
 
         var topicOneStoreSupplier = Stores.inMemoryKeyValueStore(topicStoreNameOne);
         var topicTwoStoreSupplier = Stores.inMemoryKeyValueStore(topicStoreNameTwo);
@@ -87,6 +83,7 @@ public class KafkaStreamsConfiguration {
 
         var topology = builder.build(properties);
         kafkaStreams = new KafkaStreams(topology, new CustomStreamsConfig(properties));
+//        kafkaStreams = new KafkaStreams(topology, properties);
     }
 
     private static <K, V> ValueTransformerWithKey<K, V, V> createStoreProducer(String storageName) {
@@ -115,23 +112,24 @@ public class KafkaStreamsConfiguration {
 
     @Produces
     @Named("topic-one-store")
-    public AtomicReference<ReadOnlyKeyValueStore<TopicOneModel.Key, TopicOneModel.Value>> topicOneStore() {
+    public AtomicReference<ReadOnlyKeyValueStore<String, String>> topicOneStore() {
         return topicOneStoreRef;
     }
 
     @Produces
     @Named("topic-two-store")
-    public AtomicReference<ReadOnlyKeyValueStore<TopicTwoModel.Key, TopicTwoModel.Value>> topicTwoStore() {
+    public AtomicReference<ReadOnlyKeyValueStore<String, String>> topicTwoStore() {
         return topicTwoStoreRef;
     }
 
     @Produces
     @Named("topic-three-store")
-    public AtomicReference<ReadOnlyKeyValueStore<TopicThreeModel.Key, TopicThreeModel.Value>> topicThreeStore() {
+    public AtomicReference<ReadOnlyKeyValueStore<String, String>> topicThreeStore() {
         return topicThreeStoreRef;
     }
 
     @Produces
+    @Named("assigned-partitions")
     public AtomicReference<KafkaStreams> assignedPartitions() {
         return assignedPartitions;
     }
@@ -139,18 +137,15 @@ public class KafkaStreamsConfiguration {
     public void onStartup(@Observes StartupEvent event) {
         logger.infof("Starting kafka streams");
 
-        kafkaStreams.setUncaughtExceptionHandler(exception -> {
-            logger.errorf("Unexpected error: %s", exception.getMessage());
-            return StreamsUncaughtExceptionHandler.StreamThreadExceptionResponse.SHUTDOWN_APPLICATION;
-        });
+        kafkaStreams.setUncaughtExceptionHandler((t, e) -> logger.errorf("Unexpected error: %s", e.getMessage()));
 
         kafkaStreams.setStateListener((newState, oldState) -> {
             logger.infof("Kafka streams has changed state from %s to %s", oldState.name(), newState.name());
 
             if (newState == KafkaStreams.State.RUNNING) {
-                ReadOnlyKeyValueStore<TopicOneModel.Key, TopicOneModel.Value> topicOneStore = kafkaStreams.store(StoreQueryParameters.fromNameAndType(topicStoreNameOne, QueryableStoreTypes.keyValueStore()));
-                ReadOnlyKeyValueStore<TopicTwoModel.Key, TopicTwoModel.Value> topicTwoStore = kafkaStreams.store(StoreQueryParameters.fromNameAndType(topicStoreNameTwo, QueryableStoreTypes.keyValueStore()));
-                ReadOnlyKeyValueStore<TopicThreeModel.Key, TopicThreeModel.Value> topicThreeStore = kafkaStreams.store(StoreQueryParameters.fromNameAndType(topicStoreNameThree, QueryableStoreTypes.keyValueStore()));
+                ReadOnlyKeyValueStore<String, String> topicOneStore = kafkaStreams.store(StoreQueryParameters.fromNameAndType(topicStoreNameOne, QueryableStoreTypes.keyValueStore()));
+                ReadOnlyKeyValueStore<String, String> topicTwoStore = kafkaStreams.store(StoreQueryParameters.fromNameAndType(topicStoreNameTwo, QueryableStoreTypes.keyValueStore()));
+                ReadOnlyKeyValueStore<String, String> topicThreeStore = kafkaStreams.store(StoreQueryParameters.fromNameAndType(topicStoreNameThree, QueryableStoreTypes.keyValueStore()));
 
                 topicOneStoreRef.set(topicOneStore);
                 topicTwoStoreRef.set(topicTwoStore);
