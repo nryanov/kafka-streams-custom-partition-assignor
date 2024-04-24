@@ -8,17 +8,23 @@
     <version>1.0-SNAPSHOT</version>
 
     <properties>
+        <java.source.version>17</java.source.version>
+        <java.target.version>17</java.target.version>
+
+        <maven.compiler.source>${java.source.version}</maven.compiler.source>
+        <maven.compiler.target>${java.target.version}</maven.compiler.target>
+
         <compiler-plugin.version>3.12.1</compiler-plugin.version>
-        <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-        <quarkus.platform.version>3.8.3</quarkus.platform.version>
+<!--        <quarkus.platform.version>3.8.3</quarkus.platform.version>-->
+        <quarkus.platform.version>2.16.12.Final</quarkus.platform.version>
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.2.5</surefire-plugin.version>
-        <kafka-streams.version>3.7.0</kafka-streams.version>
-        <kafka-json-serde.version>7.6.0</kafka-json-serde.version>
+<!--        <kafka.version>3.7.0</kafka.version>-->
+        <kafka.version>2.6.3</kafka.version>
     </properties>
 
     <repositories>
@@ -40,12 +46,12 @@
             <dependency>
                 <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka-streams</artifactId>
-                <version>${kafka-streams.version}</version>
+                <version>${kafka.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.confluent</groupId>
-                <artifactId>kafka-streams-json-schema-serde</artifactId>
-                <version>${kafka-json-serde.version}</version>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-clients</artifactId>
+                <version>${kafka.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -68,8 +74,8 @@
             <artifactId>kafka-streams</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.confluent</groupId>
-            <artifactId>kafka-streams-json-schema-serde</artifactId>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -78,6 +84,10 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-smallrye-openapi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-scheduler</artifactId>
         </dependency>
     </dependencies>
 
@@ -115,6 +125,10 @@
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <maven.home>${maven.home}</maven.home>
                     </systemPropertyVariables>
+                    <argLine>
+                        --illegal-access=permit
+                    </argLine>
+                    <useSystemClassLoader>false</useSystemClassLoader>
                 </configuration>
             </plugin>
             <plugin>

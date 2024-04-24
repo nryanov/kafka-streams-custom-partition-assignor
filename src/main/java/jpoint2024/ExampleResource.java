@@ -1,14 +1,12 @@
 package jpoint2024;
 
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.MediaType;
+
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
 
 @Path("/hello")
 public class ExampleResource {
     @GET
-    @Produces(MediaType.TEXT_PLAIN)
     public String hello() {
         return "Hello from RESTEasy Reactive";
     }

@@ -6,21 +6,20 @@ import java.util.*;
 
 public class SpecialTaskAssignor implements TaskAssignor {
     @Override
-    public boolean assign(Map<UUID, ClientState> clients, Set<TaskId> allTaskIds,
-                          Set<TaskId> statefulTaskIds, RackAwareTaskAssignor rackAwareTaskAssignor, AssignorConfiguration.AssignmentConfigs assignmentConfigs) {
+    public boolean assign(Map<UUID, ClientState> clients, Set<TaskId> allTaskIds, Set<TaskId> statefulTaskIds, AssignorConfiguration.AssignmentConfigs assignmentConfigs) {
         // Так как мы точно знаем, что у всех топиков одинаковое число партиций,
         // то мы можем сгруппировать таски по номерам партиций.
         // Каждый таск при этом -- это юнит чтения данных из конкретной партиции топика
         var tasksPerPartition = new HashMap<Integer, Set<TaskId>>();
 
-        allTaskIds.forEach(task -> tasksPerPartition.compute(task.partition(), (ignored, set) -> {
-                if (set == null) {
-                    set = new HashSet<>();
-                }
+        allTaskIds.forEach(task -> tasksPerPartition.compute(task.partition, (ignored, set) -> {
+            if (set == null) {
+                set = new HashSet<>();
+            }
 
-                set.add(task);
-                return set;
-            }));
+            set.add(task);
+            return set;
+        }));
 
         var clientsSize = clients.size();
 
